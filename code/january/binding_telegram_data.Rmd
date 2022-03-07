@@ -1,0 +1,90 @@
+---
+title: "Jizzax telegram data"
+author: "Nozimjon Ortiqov"
+date: "11 01 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+andijon_telegram_jan <- read_excel(here("andijon_telegram_jan.xlsx"))
+fergana_telegram_jan <- read_excel(here("fergana_telegram_jan.xlsx"))
+namangan_telegram_jan <- read_excel(here("namangan_telegram_jan.xlsx"))
+surxondaryo_telegram_jan <- read_excel(here("surxondaryo_telegram_jan.xlsx"))
+
+```
+
+
+```{r}
+colnames(andijon_telegram_jan)
+```
+
+
+```{r}
+andijon_telegram_jan_01 <- andijon_telegram_jan %>% 
+  select(month, region, area_full, price=final_price, price_m2, num_rooms) %>% 
+  mutate(month = as.character(month),
+         num_rooms = as.integer(num_rooms), 
+         price_m2 = as.double(price_m2),
+         price = as.integer(price),
+         area_full = as.double(area_full)) %>% 
+  filter(price_m2 < 1000)
+```
+
+
+```{r}
+colnames(fergana_telegram_jan)
+```
+
+```{r}
+fergana_telegram_jan_01 <- fergana_telegram_jan %>% 
+  select(month, region, area_full, price=final_price, price_m2, num_rooms = rooms) %>% 
+  mutate(month = as.character(month),
+         num_rooms = as.integer(num_rooms), 
+         price_m2 = as.double(price_m2),
+         price = as.integer(price),
+         area_full = as.double(area_full))
+```
+
+```{r}
+colnames(namangan_telegram_jan)
+```
+
+```{r}
+namangan_telegram_jan_01 <- namangan_telegram_jan %>% 
+  select(month, region, area_full, price, price_m2, num_rooms) %>% 
+  mutate(month = as.character(month),
+         num_rooms = as.integer(num_rooms), 
+         price_m2 = as.double(price_m2),
+         price = as.integer(price),
+         area_full = as.double(area_full))
+  
+```
+
+```{r}
+surxondaryo_telegram_jan_01 <- surxondaryo_telegram_jan %>% 
+  select(month, region, area_full, price, price_m2, num_rooms) %>% 
+  mutate(month = as.character(month),
+         num_rooms = as.integer(num_rooms), 
+         price_m2 = as.double(price_m2),
+         price = as.integer(price),
+         area_full = as.double(area_full))
+```
+
+
+```{r}
+telegram_regions_jan <- bind_rows(fergana_telegram_jan_01, 
+                                  namangan_telegram_jan_01, 
+                                  andijon_telegram_jan_01, 
+                                  surxondaryo_telegram_jan_01)
+``` 
+
+
+```{r}
+write_xlsx(telegram_regions_jan, "telegram_regionsjan_jan.xlsx")  
+```
+
+

@@ -1,0 +1,112 @@
+---
+title: "Cleaning_telegram_data"
+author: "Nozimjon Ortiqov"
+date: "2022-01-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(emo)
+library(DataEditR)
+library(stringr.plus)
+```
+
+
+```{r}
+#importing data
+input_data <- read_excel(here("data", "telegram", "telegram.xlsx"))
+```
+
+
+```{r}
+telegram_data <- input_data %>% 
+  select(-channel, -post_id, -views) %>% 
+  mutate(date_format = ymd_hms(date)) %>% 
+  mutate(month = month(date_format, label = TRUE)) 
+  #filter(month == "дек")
+```
+
+```{r}
+emo_list <- telegram_data %>% 
+  mutate(emo_avail = ji_detect(post)) %>% 
+  mutate(emos = ji_extract_all(post)) %>% 
+  pull(emos)
+```
+
+```{r}
+red_flag <- "🚩"
+```
+
+
+```{r}
+
+  data_incleaning <- telegram_data %>% 
+    filter(str_detect(post, red_flag), 
+         !str_detect(post, "Kvartira olaman"),
+         !str_detect(post, "Sotildi"), 
+         str_detect(post, "qavat"), 
+         !str_detect(post, "IJARAGA"),
+         !str_detect(post, "Ijara"),
+         !str_detect(post, "ijaraga"),
+         !str_detect(post, "sotix"),
+         !str_detect(post, "Xovli"), 
+         !str_detect(post, "Kredit")) %>% 
+    mutate(num_rooms = str_extract(post, "\\d+(?= xona)")) %>% 
+    mutate(area = str_extract(post, "(\\d+[\\.,]?\\d*)+(?= m²)")) %>% 
+    mutate(price_post = str_replace(post, "💲", " dollars")) %>% 
+    mutate(price_post = str_replace(price_post, "💰", "price ")) %>% 
+    mutate(narx = str_extract(price_post, "(\\d+[\\.,]?\\d*)+(?= dollars)")) %>% 
+    mutate(narx2 = str_extract(price_post, "(?<=price?\\s{0,10})(\\d+[\\.,]?\\d*)")) %>% 
+    group_by(num_rooms, area, narx, narx2) %>% 
+    slice(1L) %>% 
+    ungroup() %>% 
+    select(-post, -date, -date_format) %>% 
+    filter(!str_detect(price_post, "kredit")) %>% 
+    filter(!str_detect(price_post,  "Kvartira beriladi️" ))
+ 
+```
+
+
+```{r}
+andijon_ready <- data_incleaning %>% 
+  #filter(num_rooms == 1) %>% 
+  mutate(area_full = if_else(is.na(area) & num_rooms == 1, "35", area)) %>% 
+  mutate(area_full = if_else(is.na(area) & num_rooms == 2, "50", area_full)) %>%
+  mutate(area_full = if_else(is.na(area) & num_rooms == 3, "65", area_full)) %>%
+  mutate(area_full = if_else(is.na(area) & num_rooms == 4, "92", area_full)) %>% 
+  filter(!is.na(narx) & !is.na(narx2)) %>% 
+  filter(!narx == "80,000" & !narx == "5000") %>% 
+  mutate(narx = str_replace(narx, pattern = "\\.", replacement = "")) %>% 
+  mutate(narx = str_replace(narx, pattern = ",", replacement = "")) %>% 
+  mutate(area_full = str_replace(area_full, pattern = ",", replacement = "\\.")) %>% 
+  mutate(narx = parse_number(narx), 
+         area_full = parse_number(area_full)) %>% 
+  mutate(price_m2 = narx/area_full) %>% 
+  filter(area_full < 200) %>% 
+  filter(!str_detect(price_post,  "qolgan to`lovi bor" )) %>% 
+  filter(!area_full==120) %>% 
+  slice(-131) %>% 
+  mutate(month = recode(month, "окт" = "ноя")) %>% 
+  filter(month >= "ноя" ) %>% 
+  mutate(region = "Андижон")
+
+andijon_data_2 <- andijon_ready %>% 
+  select(area_full, price_m2) %>% 
+  rename(area = area_full)
+
+
+```
+
+
+```{r}
+
+string_to_do <- input_data$post[2]
+
+str_extract_between(string_to_do, pattern1 = '💰', pattern2 = "🍏")
+
+```
+

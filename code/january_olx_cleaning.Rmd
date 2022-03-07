@@ -1,0 +1,105 @@
+---
+title: "Olx Data December"
+author: "Nozimjon Ortiqov"
+date: "2022-01-10"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+all_reg_jan <- dir(here("data", "january"), pattern=".xlsx", full.names=TRUE) %>%
+    purrr::map_dfr(readxl::read_excel, na="*", .id = "region")
+```
+
+
+```{r}
+all_reg_jan_02 <- all_reg_jan %>% 
+  select(-2, -link) %>% 
+  mutate(region = recode(region,
+                                              "1" = "Андижон",
+                                              "2" = "Бухоро",
+                                              "3" = "Жиззах",
+                                              "4" = "Фарғона",
+                                              "5" = "Хоразм",
+                                              "6" = "Қорақалпоғистон",
+                                              "7" = "Қашқадарё",
+                                              "8" = "Наманган",
+                                              "9" = "Навоий",
+                                              "10" = "Самарқанд",
+                                              "11" = "Сурхондарё",
+                                              "12" = "Сирдарё",
+                                              "13" = "Тошкент вилояти",
+                                              "14" = "Тошкент")) %>% 
+  mutate(region = if_else(city == "Мирабад", "Тошкент", region)) %>% 
+  mutate(city= recode(city, "Мирабад" = "Мирабадский"))
+```
+
+
+```{r}
+price_jan <- all_reg_jan_02 %>% 
+  mutate(price_true = if_else(price > 200 & price <= 1500, price, price_m2)) %>% 
+  relocate(area, price_true, .after = price_m2) %>% 
+  distinct() 
+
+write_xlsx(price_jan, "price_jan_olx.xlsx")
+```
+
+
+```{r}
+secondary_market_jan <- price_jan %>% 
+  group_by(region) %>% 
+  filter(!is.na(price_true), area > 15, area < 400, home_type == "Вторичный рынок" ) %>% 
+  filter(price_true <= quantile(price_true, 0.99), price_true >= quantile(price_true, 0.05)) %>%
+  ungroup() %>% 
+  mutate(date = dmy(date), 
+         month = month(date, label = TRUE)) %>% 
+  filter(month == "янв") %>% 
+  group_by(num_rooms, price, apart_floor, home_floor, area, city) %>%
+  slice(1L) %>% 
+  ungroup() %>% 
+  select(region, month, price_m2 = price_true, price, area_full=area, num_rooms, condition, city) %>% 
+   mutate(month = as.character(month),
+     num_rooms = as.integer(num_rooms), 
+         price_m2 = as.double(price_m2),
+         price = as.integer(price),
+         area_full = as.double(area_full)) %>% 
+  filter(region == "Жиззах") %>% 
+   summarise(mean_dec = mean(price_m2),
+            median_dec= median(price_m2),
+            num_obs_dec = n(),
+            min_dec = min(price_m2), 
+            max_dec= max(price_m2)) 
+
+write_xlsx(secondary_market_jan, "secondary_market_jan_olx.xlsx") 
+```
+
+
+```{r}
+primary_market_jan <- price_jan %>% 
+  filter(home_type != "Вторичный рынок") %>% 
+  mutate(date = dmy(date), 
+         month = month(date, label = TRUE)) %>% 
+  filter(month == "янв") %>% 
+  group_by(num_rooms, price, apart_floor, home_floor, area) %>%
+  slice(1L) %>% 
+  ungroup() %>% 
+  filter(!is.na(price_true), area > 15, area < 400) %>% 
+  filter(price_true <= quantile(price_true, 0.97), price_true >= quantile(price_true, 0.03)) 
+
+write_xlsx(primary_market_jan, "primary_data_jan_all.xlsx") 
+```
+
+```{r}
+price_jan %>% select(where(is.numeric)) %>% cor(use = "pairwise.complete.obs", method = "spearman") %>% 
+  corrplot(type = "upper", diag = FALSE, method = "square")
+```
+
+
+
+
+

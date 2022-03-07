@@ -1,0 +1,166 @@
+---
+title: "Housing Price"
+author: "Nozimjon Ortiqov"
+date: "13/12/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(lubridate)
+library(maps)
+library(cowplot)
+library(ggcharts)
+library(tidytext)
+library(patchwork)
+library(hrbrthemes)
+library(stringr)
+library(tsibble)
+library(modelsummary)
+library(gtsummary)
+library(openxlsx)
+library(DataExplorer)
+library(janitor)
+library(skimr)
+library(here)
+library(readxl)
+library(writexl)
+library(purrr)
+library(jsmp)
+```
+
+
+```{r}
+here()
+```
+
+```{r Importing-data, message=FALSE, warning=FALSE}
+all_reg <- dir(here::here("data"), pattern=".xlsx", full.names=TRUE) %>%
+    purrr::map_dfr(readxl::read_excel, na="*", .id = "region")
+```
+
+#Removing unnecessary columns 
+ 
+```{r Selecting-columns, message=FALSE, warning=FALSE}
+
+all_reg <- all_reg %>% select(-2, -link, -(district:year))
+```
+
+#Re-coding region variable
+
+```{r}
+all_reg <- all_reg %>% mutate(region = recode(region,
+                                              "1" = "Андижон",
+                                              "2" = "Бухоро",
+                                              "3" = "Жиззах",
+                                              "4" = "Фаргона",
+                                              "5" = "Хоразм",
+                                              "6" = "Коракалпогистон",
+                                              "7" = "Кашкадарё",
+                                              "8" = "Наманган",
+                                              "9" = "Навоий",
+                                              "10" = "Самарканд",
+                                              "11" = "Сурхандарё",
+                                              "12" = "Сирдарё",
+                                              "13" = "Тошкент",
+                                              "14" = "Тошкент вилояти"))
+```
+
+
+```{r}
+price_res <- all_reg %>% 
+  mutate(price_true = if_else(price > 200 & price <= 1500, price, price_m2)) %>% 
+  relocate(area, price_true, .after = price_m2) %>% 
+  distinct() %>% 
+  add_count(region)
+```
+
+```{r}
+secondary_market <- price_res %>% 
+  group_by(region) %>% 
+  filter(!is.na(price_true), area > 15, area < 400, home_type == "Вторичный рынок" ) %>% 
+  filter(price_true <= quantile(price_true, 0.95), price_true >= quantile(price_true, 0.05)) %>%
+  ungroup() %>% 
+  mutate(date = dmy(date)) 
+```
+
+```{r}
+primary_market <- price_res %>% 
+  group_by(region) %>% 
+  filter(!is.na(price_true), area > 15, area < 400, home_type == "Новостройки" ) %>% 
+  filter(price_true <= quantile(price_true, 0.95), price_true >= quantile(price_true, 0.05)) %>%
+  ungroup() %>% 
+  mutate(date = dmy(date))
+```
+
+
+```{r}
+glimpse()
+skim()
+```
+
+```{r}
+secondary_market %>% 
+  tab(apart_floor)
+```
+
+
+```{r}
+secondary_market %>%  filter(apart_floor == "36")
+
+```
+
+```{r}
+ggplot(all_reg_group, aes(area))+
+  geom_histogram()
+```
+
+```{r}
+theme_set(theme_light(base_size = 14))  
+
+  primary_g <- primary_market %>%  
+  mutate(region = fct_reorder(region, price_true)) %>% 
+  ggplot(., aes(region, price_true, color = region))+
+  coord_flip() +
+  scale_y_continuous(limits = c(0, 1300),  expand = c(0.005, 0.005))+
+  labs(x = NULL, y = "1 квадрат метр уй-жой нархи (долларда)") +
+    theme(
+      legend.position = "none",
+      axis.title = element_text(size = 14),
+      panel.grid = element_blank()
+    )
+```
+
+
+```{r}
+  primary_g + 
+  geom_jitter(size = 0.5, alpha = 0.25, width = 0.1)+
+  stat_summary(fun = mean, geom = "point", size = 4)+
+  geom_hline(aes(yintercept = rep_avg), color = "gray70", size = 0.6) 
+  
+  
+  geom_boxplot(color = "gray60", outlier.alpha = 0) +
+  geom_point(size = 3, alpha = 0.15)
+
+```
+
+```{r}
+rep_avg <-
+  primary_market %>%
+  summarize(avg = mean(price_true, na.rm = T)) %>%
+  pull(avg)
+```
+
+
+```{r}
+secondary_market %>%  
+  mutate(region = fct_reorder(region, price_true)) %>% 
+  ggplot(., aes(region, price_true))+
+  geom_boxplot()
+```
+

@@ -1,0 +1,95 @@
+---
+title: "Cleaning_telegram_data"
+author: "Nozimjon Ortiqov"
+date: "2022-01-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+#importing data
+andijon_telegram_jan <- read_excel(here("data", "january", "telegram", "andijon.txt_uzbek.xlsx"))
+```
+
+
+```{r}
+andijon_telegram_jan_01 <- andijon_telegram_jan %>% 
+  select(-channel, -post_id, -views) %>% 
+  mutate(date_format = ymd_hms(date)) %>% 
+  mutate(month = month(date_format, label = TRUE)) 
+  #filter(month == "дек")
+```
+
+```{r}
+emo_list <- andijon_telegram_jan_01  %>% 
+  mutate(emo_avail = ji_detect(post)) %>% 
+  mutate(emos = ji_extract_all(post)) %>% 
+  pull(emos)
+```
+
+```{r}
+red_flag <- "🚩"
+```
+
+
+```{r}
+
+  andijon_telegram_jan_02  <- andijon_telegram_jan_01  %>% 
+    filter(str_detect(post, red_flag), 
+         !str_detect(post, "Kvartira olaman"),
+         !str_detect(post, "Sotildi"), 
+         str_detect(post, "qavat"), 
+         !str_detect(post, "IJARAGA"),
+         !str_detect(post, "Ijara"),
+         !str_detect(post, "ijaraga"),
+         !str_detect(post, "sotix"),
+         !str_detect(post, "Xovli"), 
+         !str_detect(post, "Kredit")) %>% 
+    mutate(num_rooms = str_extract(post, "\\d+(?= xona)")) %>% 
+    mutate(area = str_extract(post, "(\\d+[\\.,]?\\d*)+(?= m²)")) %>% 
+    mutate(price_post = str_replace(post, "💲", " dollars")) %>% 
+    mutate(price_post = str_replace(price_post, "💰", "price ")) %>% 
+    mutate(narx = str_extract(price_post, "(\\d+[\\.,]?\\d*)+(?= dollars)")) %>% 
+    mutate(narx2 = str_extract(price_post, "(?<=price?\\s{0,10})(\\d+[\\.,]?\\d*)")) %>% 
+    group_by(num_rooms, area, narx, narx2) %>% 
+    slice(1L) %>% 
+    ungroup() %>% 
+    select(-post, -date, -date_format) %>% 
+    filter(!str_detect(price_post, "kredit")) %>% 
+    filter(!str_detect(price_post,  "Kvartira beriladi️" )) %>%
+    mutate(final_price = if_else(is.na(narx), narx2, narx))
+             
+         
+ 
+```
+
+
+```{r}
+andijon_telegram_jan_03 <- andijon_telegram_jan_02  %>% 
+  mutate(area_full = if_else(is.na(area) & num_rooms == 1, "35", area)) %>% 
+  mutate(area_full = if_else(is.na(area) & num_rooms == 2, "50", area_full)) %>%
+  mutate(area_full = if_else(is.na(area) & num_rooms == 3, "65", area_full)) %>%
+  mutate(area_full = if_else(is.na(area) & num_rooms == 4, "92", area_full)) %>% 
+  filter(!is.na(narx) & !is.na(narx2)) %>% 
+  mutate(final_price = str_replace(narx, pattern = "\\.", replacement = "")) %>% 
+  mutate(final_price = str_replace(final_price, pattern = ",", replacement = "")) %>% 
+  mutate(area_full = str_replace(area_full, pattern = ",", replacement = "\\.")) %>% 
+  mutate(final_price = parse_number(final_price), 
+         area_full = parse_number(area_full)) %>% 
+  mutate(price_m2 = final_price/area_full) %>% 
+  filter(area_full < 200) %>% 
+  filter(!str_detect(price_post,  "qolgan to`lovi bor" )) %>% 
+  mutate(region = "Андижон") %>% 
+  select(-price_post, -area, -narx, -narx2)
+
+
+
+write_xlsx(andijon_telegram_jan_03, "andijon_telegram_jan.xlsx")  
+```
+
+
+

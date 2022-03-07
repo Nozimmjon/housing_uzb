@@ -1,0 +1,105 @@
+---
+title: "Olx Data December"
+author: "Nozimjon Ortiqov"
+date: "2022-01-10"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Importing-data, message=FALSE, warning=FALSE}
+
+input_data_reg <- read_excel(here("data", "december", "price_regions_dec.xlsx"))
+input_data_tash <- read_excel(here("data", "december", "tash_city_price_dec.xlsx"))
+input_data_sam <-  read_excel(here("data", "december", "samarkand_dec.xlsx")) %>% 
+  select(-1) %>%  mutate(area = as.numeric(area), region = "Самарканд")
+
+input_data_sam_02 <-  read_excel(here("data", "december", "samarkand.xlsx")) %>% 
+  select(-1) %>%  mutate(area = as.numeric(area))
+```
+
+```{r}
+skim(input_data_sam) 
+```
+
+```{r}
+skim(input_data_reg)
+```
+
+
+```{r}
+region_all <- bind_rows(input_data_reg, input_data_tash, input_data_sam, input_data_sam_02)
+```
+
+#Removing unnecessary columns 
+ 
+```{r Selecting-columns, message=FALSE, warning=FALSE}
+
+all_reg_dec <- region_all %>% select(-link, -(day:year))
+
+```
+
+#Re-coding region variable
+
+```{r}
+all_reg_dec_01 <- all_reg_dec %>% mutate(region = recode(region,
+                                              "Андижан" = "Андижон",
+                                              "Бухара" = "Бухоро",
+                                              "Джизак" = "Жиззах",
+                                              "Фергана" = "Фарғона",
+                                              "Хоразм" = "Хоразм",
+                                              "Қорақалпоқ" = "Қорақалпоғистон",
+                                              "Кашкадарё" = "Кашкадарё",
+                                              "Наманган" = "Наманган",
+                                              "Навои" = "Навоий",
+                                              "Самарканд" = "Самарқанд",
+                                              "Сурхондарё" = "Сурхандарё",
+                                              "Сирдарё" = "Сирдарё",
+                                              "Тошкент" = "Тошкент",
+                                              "Тошкент вил" = "Тошкент вилояти"))
+```
+
+
+
+```{r}
+price_res_dec <- all_reg_dec_01 %>% 
+  #mutate(price_true = if_else(price > 100 & price <= 1500, price, price_m2)) %>% 
+  group_by(date,  price, home_type, region, city, price_m2, furnished, commission,   
+           num_rooms, area, apart_floor,  home_floor, condition,   build_type,
+           build_plan, build_year, bathroom, ceil_height, hospital, 
+           playground, kindergarten, park, recreation, school, restaurant,
+           supermarket,  title_text,   post_text) %>% 
+  slice(1L) %>% 
+  ungroup()  
+
+```
+
+
+```{r}
+secondary_market_dec <- price_res_dec %>% 
+  group_by(region) %>% 
+  filter(area > 15, area < 400, home_type == "Вторичный рынок" ) %>% 
+  filter(price_m2 <= quantile(price_m2, 0.95), price_m2 >= quantile(price_m2, 0.05)) %>%
+  ungroup() %>% 
+  mutate(date = dmy(date), 
+         month = month(date, label = TRUE)) %>% 
+  group_by(num_rooms, price, apart_floor, home_floor, area, city) %>%
+  slice(1L) %>% 
+  ungroup() %>% 
+  #filter(month == "дек") %>% 
+  select(region, month, price_m2, price, area_full=area, num_rooms, condition, city) %>% 
+  mutate(month = as.character(month),
+         num_rooms = as.integer(num_rooms), 
+         price_m2 = as.double(price_m2),
+         price = as.integer(price),
+         area_full = as.double(area_full)) %>% 
+  mutate(region = if_else(city == "Мирабад", "Тошкент", region)) %>% 
+  mutate(city= recode(city, "Мирабад" = "Мирабадский"))
+
+write_xlsx(secondary_market_dec, "secondary_data_dec_olx.xlsx") 
+```
+
+

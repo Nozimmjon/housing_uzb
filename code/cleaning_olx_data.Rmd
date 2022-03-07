@@ -1,0 +1,99 @@
+---
+title: "olx_data_preparation"
+author: "Nozimjon Ortiqov"
+date: "2022-01-06"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+here()
+```
+
+```{r Importing-data, message=FALSE, warning=FALSE}
+all_reg <- dir(here::here("data"), pattern=".xlsx", full.names=TRUE) %>%
+    purrr::map_dfr(readxl::read_excel, na="*", .id = "region")
+```
+
+#Removing unnecessary columns 
+ 
+```{r Selecting-columns, message=FALSE, warning=FALSE}
+
+all_reg_01 <- all_reg %>% select(-2, -link)
+```
+
+#Re-coding region variable
+
+```{r}
+all_reg_02 <- all_reg_01 %>% mutate(region = recode(region,
+                                              "1" = "Андижон",
+                                              "2" = "Бухоро",
+                                              "3" = "Жиззах",
+                                              "4" = "Фаргона",
+                                              "5" = "Хоразм",
+                                              "6" = "Коракалпогистон",
+                                              "7" = "Кашкадарё",
+                                              "8" = "Наманган",
+                                              "9" = "Навоий",
+                                              "10" = "Самарканд",
+                                              "11" = "Сурхандарё",
+                                              "12" = "Сирдарё",
+                                              "13" = "Тошкент",
+                                              "14" = "Тошкент вилояти"))
+```
+
+```{r}
+all_reg_03 <- all_reg_02 %>% 
+  mutate(region = if_else(city == "Мирабад", "Тошкент", region)) %>% 
+  mutate(city= recode(city, "Мирабад" = "Мирабадский"))
+```
+
+
+
+```{r}
+price_res <- all_reg_03 %>% 
+  mutate(price_true = if_else(price > 200 & price <= 1500, price, price_m2)) %>% 
+  relocate(area, price_true, .after = price_m2) %>% 
+  distinct() %>% 
+  add_count(region)
+```
+
+
+
+```{r}
+secondary_market_nov <- price_res %>% 
+  group_by(region) %>% 
+  filter(!is.na(price_true), area > 15, area < 400, home_type == "Вторичный рынок" ) %>% 
+  filter(price_true <= quantile(price_true, 0.95), price_true >= quantile(price_true, 0.05)) %>%
+  ungroup() %>% 
+  mutate(date = dmy(date), 
+         month = "ноя") %>% 
+  group_by(post_text, num_rooms) %>% 
+  slice(1L) %>% 
+  ungroup()
+```
+
+```{r}
+regions_nov_olx <-  secondary_market_nov %>% 
+  select(region, month, price_m2 = price_true, price, area_full=area, num_rooms, condition, city) %>% 
+   mutate(month = as.character(month),
+         num_rooms = as.integer(num_rooms), 
+         price_m2 = as.double(price_m2),
+         price = as.integer(price),
+         area_full = as.double(area_full))
+```
+
+
+```{r}
+secondary_market %>% 
+  tab(apart_floor)
+```
+
+
+
+

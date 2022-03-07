@@ -1,0 +1,231 @@
+---
+title: "Untitled"
+author: "Nozimjon Ortiqov"
+date: "12 01 2022"
+output: html_document
+---
+
+```{r}
+telegram_data_reg <- read_excel(here("code", "telegram_regions.xlsx"))
+```
+
+#Binding all data frames into one file
+
+```{r}
+final_data <- bind_rows(telegram_data_reg, regions_nov_olx, secondary_market_dec)
+
+write_xlsx(final_data, "final_data.xlsx")
+```
+
+```{r}
+final_data %>% group_by(region) %>% 
+  skim()
+```
+
+
+```{r}
+price_data <- final_data %>% 
+  group_by(region, month) %>% 
+  summarise(mean = mean(price_m2),
+            median= median(price_m2),
+            num_obs = n(),
+            min = min(price_m2), 
+            max= max(price_m2))
+
+
+write_xlsx(price_data, "price_data_regions.xlsx")
+```
+
+```{r}
+price_tashkent <- final_data %>%
+   filter(region == "Тошкент", condition != "Евроремонт",
+         condition != "Авторский проект") %>%  
+  group_by(city, month) %>% 
+  summarise(mean = mean(price_m2),
+            median= median(price_m2),
+            num_obs = n(),
+            min = min(price_m2), 
+            max= max(price_m2))
+
+
+write_xlsx(price_tashkent, "price_data_tashkent.xlsx")
+```
+
+
+```{r}
+price_tashkent_average <- final_data %>%
+  filter(region == "Тошкент", condition != "Евроремонт",
+         condition != "Авторский проект") %>% 
+  group_by(month) %>% 
+  summarise(mean = mean(price_m2),
+            median= median(price_m2),
+            num_obs = n(),
+            min = min(price_m2), 
+            max= max(price_m2))
+write_xlsx(price_tashkent_average, "price_tashkent_average.xlsx")
+```
+
+```{r}
+final_data %>%
+  filter(region == "Тошкент") %>% 
+  tab(condition)
+```
+
+
+# Data Visualisation
+
+```{r}
+primary_g <- final_data %>%  
+  filter(month == "дек") %>% 
+  mutate(region = fct_reorder(region, price_m2)) %>% 
+  ggplot(aes(region, price_m2, color = region))+
+  coord_flip()+
+  #theme_ipsum_rc()+
+  #theme_ipsum()+
+  theme_bw()+
+  #scale_color_manual(values=as.vector(glasbey(14)))+
+  scale_y_continuous(limits = c(0, 1300),  expand = c(0.005, 0.005))+
+  labs(x = NULL, 
+       y = "Уй-жой нархи (1 кв метр учун долларда)",
+       title = "Ҳудудлар марказларида уй-жой нархлари", 
+       subtitle = "2021 йил декабрь ойи",
+       caption = "Очиқ интернет маълумотлари асосида ҳисобланган") +
+    theme(axis.title.y = element_text(vjust = 0, size = 14),
+      legend.position = "none",
+      axis.title = element_text(size = 13),
+      axis.text.x = element_text(color = "black", size = 11), #Change Aesthetics of Axis Text
+      plot.title = element_text(face = "bold",
+                                  margin = margin(10, 0, 10, 0),
+                                  size = 14),
+      plot.caption = element_text(face = "italic",
+                                  margin = margin(10, 0, 10, 0)))
+ 
+```
+
+
+```{r}
+colourCount <- length(unique(final_data$region)) # number of levels
+```
+
+
+```{r}
+  primary_g+ 
+  geom_boxplot(aes(fill = region, fill = after_scale(lighten(fill, .7)),
+                   outlier.alpha = 0,
+                   outlier.shape = NA))+
+  geom_jitter(size = 0.5, alpha = 0.10, width = 0.1) +
+  scale_fill_manual(values = getPalette(colourCount))+
+  scale_color_manual(values = getPalette(colourCount))
+  
+  
+  #scale_fill_manual(values = colorRampPalette(brewer.pal(14,
+                                                         "Set3"))(colourCount))+
+  #scale_color_manual(values = colorRampPalette(brewer.pal(14,
+                                                     "Set3"))(colourCount))
+
+```
+
+
+
+
+
+
+```{r}
+tash_median <-  final_data %>%
+  filter(region == "Тошкент", 
+         condition != "Евроремонт",
+         condition != "Авторский проект",
+         month == "дек") %>% 
+  summarise(median= median(price_m2)) %>% 
+  pull(median)
+            
+```
+
+# Tashkent visualization
+
+```{r}
+tashkent_g <- final_data %>%
+  filter(region == "Тошкент", condition != "Евроремонт",
+         condition != "Авторский проект") %>%   
+  filter(month == "дек") %>% 
+  mutate(city = fct_reorder(city, price_m2)) %>% 
+  ggplot(aes(city, price_m2, color = city))+
+  coord_flip()+
+  #theme_ipsum_rc()+
+  #theme_ipsum()+
+  theme_bw()+
+  #scale_color_manual(values=as.vector(glasbey(14)))+
+  #scale_y_continuous(limits = c(100, 1500),  expand = c(0.005, 0.005))+
+  labs(x = NULL, 
+       y = "Уй-жой нархи (1 кв метр учун долларда)",
+       title = "Ҳудудлар марказларида уй-жой нархлари", 
+       subtitle = "2021 йил декабрь ойи",
+       caption = "Очиқ интернет маълумотлари асосида ҳисобланган") +
+    theme(axis.title.y = element_text(vjust = 0, size = 14),
+      plot.background = element_rect(fill="#EFECEA", color= NA),
+      panel.background = element_rect(fill="transparent", size = 0),
+      legend.position = "none",
+      axis.title = element_text(size = 13),
+      axis.text.x = element_text(color = "black", size = 11), #Change Aesthetics of Axis Text
+      plot.title = element_text(face = "bold",
+                                  margin = margin(10, 0, 10, 0),
+                                  size = 14),
+      plot.caption = element_text(face = "italic",
+                                  margin = margin(10, 0, 10, 0)))
+```
+
+
+```{r}
+  tashkent_g_plus <- tashkent_g + 
+  #geom_boxplot(aes(fill = city, fill = after_scale(lighten(fill, .7)),
+                   #outlier.alpha = 0,
+                   #outlier.shape = NA))+
+  geom_hline(aes(yintercept = tash_median), color = "gray70", size = 0.8) +
+  geom_jitter(size = 0.7, alpha = 0.3, width = 0.1) +
+  stat_summary(fun = median, geom = "point", size = 4)+
+  scale_fill_manual(values = getPalette(colourCount))+
+  scale_color_manual(values = getPalette(colourCount))
+  
+```
+
+
+
+```{r}
+tashkent_g_text <- tashkent_g_plus +
+  annotate(
+    "text", x = 11.3, y = 800, family = "Poppins", size = 2.8, color = "gray20", lineheight = .9,
+    label = glue::glue("Шаҳар ўртача нархи:\n{round(tash_median, 1)} доллар")
+  ) 
+  
+```
+
+#ggridges
+
+```{r}
+g_ridges <- final_data %>%
+  filter(region == "Тошкент", condition != "Евроремонт",
+         condition != "Авторский проект") %>%   
+  filter(month == "дек") %>% 
+  mutate(city = fct_reorder(city, price_m2)) %>% 
+  ggplot(aes(price_m2, city, color = city, fill = city)) + 
+  coord_cartesian(clip = "off") +
+  scale_y_discrete(expand = c(.07, .07)) +
+  scale_fill_manual(values = getPalette(colourCount))+
+  scale_color_manual(values = getPalette(colourCount))+
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(face = "plain", family = "Roboto Mono", size = 12),
+    axis.text.y = element_text(face = "bold", family = "Roboto", size = 12),
+    panel.grid.major.x = element_line(color = "grey90", size = .6),
+    panel.grid.major.y = element_blank(),
+    legend.position = "none"
+  )
+
+g_ridges +
+  ggridges::geom_density_ridges(
+    quantile_lines = TRUE, quantiles = 2, 
+    color = "black", alpha = .8, size = 1
+  )
+```
+
+
